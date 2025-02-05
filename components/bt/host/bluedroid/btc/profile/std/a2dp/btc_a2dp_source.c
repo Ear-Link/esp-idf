@@ -121,7 +121,7 @@ enum {
 
 /* 5 frames is equivalent to 6.89*5*2.9 ~= 100 ms @ 44.1 khz, 20 ms mediatick */
 #define MAX_OUTPUT_A2DP_FRAME_QUEUE_SZ         (5)
-#define MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ     (27) // 18 for 20ms tick
+#define MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ     (18) // 18 for 20ms tick
 
 #define BTC_A2DP_SRC_DATA_QUEUE_IDX            (1)
 
