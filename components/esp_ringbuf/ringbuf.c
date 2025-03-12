@@ -1273,6 +1273,18 @@ size_t xRingbufferGetCurFreeSize(RingbufHandle_t xRingbuffer)
     return xFreeSize;
 }
 
+size_t xRingbufferGetCurFreeSizeFromISR(RingbufHandle_t xRingbuffer)
+{
+    Ringbuffer_t *pxRingbuffer = (Ringbuffer_t *)xRingbuffer;
+    configASSERT(pxRingbuffer);
+
+    size_t xFreeSize;
+    portENTER_CRITICAL_ISR(&pxRingbuffer->mux);
+    xFreeSize = pxRingbuffer->xGetCurMaxSize(pxRingbuffer);
+    portEXIT_CRITICAL_ISR(&pxRingbuffer->mux);
+    return xFreeSize;
+}
+
 BaseType_t xRingbufferAddToQueueSetRead(RingbufHandle_t xRingbuffer, QueueSetHandle_t xQueueSet)
 {
     Ringbuffer_t *pxRingbuffer = (Ringbuffer_t *)xRingbuffer;

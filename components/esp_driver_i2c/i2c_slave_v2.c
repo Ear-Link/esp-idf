@@ -410,6 +410,87 @@ esp_err_t i2c_slave_write(i2c_slave_dev_handle_t i2c_slave, const uint8_t *data,
     return ESP_OK;
 }
 
+esp_err_t i2c_slave_write_from_isr(i2c_slave_dev_handle_t i2c_slave, const uint8_t *data, uint32_t len, uint32_t *write_len, BaseType_t *pxHigherPriorityTaskWoken)
+{
+    ESP_RETURN_ON_FALSE(i2c_slave, ESP_ERR_INVALID_ARG, TAG, "i2c slave not initialized");
+    ESP_RETURN_ON_FALSE(data, ESP_ERR_INVALID_ARG, TAG, "invalid data buffer");
+    ESP_RETURN_ON_FALSE(write_len, ESP_ERR_INVALID_ARG, TAG, "invalid write length pointer");
+
+    uint32_t free_fifo_len = 0;
+    uint32_t write_ringbuffer_len = 0;
+    uint32_t actual_write_fifo_size = 0;
+    uint8_t *existing_data = NULL;
+    size_t existing_size = 0;
+    i2c_hal_context_t *hal = &i2c_slave->base->hal;
+
+    // Attempt to take the operation mutex (non-blocking in ISR)
+    if (xSemaphoreTakeFromISR(i2c_slave->operation_mux, pxHigherPriorityTaskWoken) != pdTRUE) {
+        // Mutex not available, return timeout error
+        return ESP_ERR_TIMEOUT;
+    }
+
+    portENTER_CRITICAL_ISR(&i2c_slave->base->spinlock);
+#if !SOC_I2C_SLAVE_CAN_GET_STRETCH_CAUSE
+    i2c_ll_slave_disable_tx_it(hal->dev);
+    uint32_t txfifo_len = 0;
+    i2c_ll_get_txfifo_len(hal->dev, &txfifo_len);
+    if (txfifo_len < SOC_I2C_FIFO_LEN) {
+        // For the target (esp32) cannot stretch, reset the fifo when there is any dirty data in fifo.
+        i2c_ll_txfifo_rst(hal->dev);
+    }
+#endif
+    i2c_ll_get_txfifo_len(hal->dev, &free_fifo_len);
+    portEXIT_CRITICAL_ISR(&i2c_slave->base->spinlock);
+
+    // Check if there is any data in the ringbuffer from the last transaction
+    existing_data = xRingbufferReceiveUpToFromISR(i2c_slave->tx_ring_buf, &existing_size, free_fifo_len);
+    if (existing_data) {
+        // Has data, fill to the FIFO
+        i2c_ll_write_txfifo(hal->dev, existing_data, existing_size);
+        free_fifo_len -= existing_size;
+        vRingbufferReturnItemFromISR(i2c_slave->tx_ring_buf, existing_data, pxHigherPriorityTaskWoken);
+    }
+
+    // Write data to the FIFO
+    if (free_fifo_len) {
+        portENTER_CRITICAL_ISR(&i2c_slave->base->spinlock);
+        if (len < free_fifo_len) {
+            actual_write_fifo_size = len;
+        } else {
+            actual_write_fifo_size = free_fifo_len;
+        }
+        i2c_ll_write_txfifo(hal->dev, (uint8_t *)data, actual_write_fifo_size);
+        data += actual_write_fifo_size;
+        len -= actual_write_fifo_size;
+        portEXIT_CRITICAL_ISR(&i2c_slave->base->spinlock);
+    }
+
+    // Write remaining data to the ringbuffer (non-blocking in ISR)
+    if (len) {
+        write_ringbuffer_len = xRingbufferGetCurFreeSizeFromISR(i2c_slave->tx_ring_buf);
+        if (len < write_ringbuffer_len) {
+            write_ringbuffer_len = len;
+        }
+
+        if (xRingbufferSendFromISR(i2c_slave->tx_ring_buf, data, write_ringbuffer_len, pxHigherPriorityTaskWoken) != pdTRUE) {
+            write_ringbuffer_len = 0;
+        }
+    }
+
+    *write_len = write_ringbuffer_len + actual_write_fifo_size;
+
+    // Enable TX interrupt and clear stretch
+    portENTER_CRITICAL_ISR(&i2c_slave->base->spinlock);
+    i2c_ll_slave_enable_tx_it(hal->dev);
+    i2c_ll_slave_clear_stretch(hal->dev);
+    portEXIT_CRITICAL_ISR(&i2c_slave->base->spinlock);
+
+    // Release the operation mutex (non-blocking in ISR)
+    xSemaphoreGiveFromISR(i2c_slave->operation_mux, pxHigherPriorityTaskWoken);
+
+    return ESP_OK;
+}
+
 esp_err_t i2c_slave_register_event_callbacks(i2c_slave_dev_handle_t i2c_slave, const i2c_slave_event_callbacks_t *cbs, void *user_data)
 {
     ESP_RETURN_ON_FALSE(i2c_slave != NULL, ESP_ERR_INVALID_ARG, TAG, "i2c slave handle not initialized");

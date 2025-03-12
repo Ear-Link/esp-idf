@@ -431,6 +431,23 @@ size_t xRingbufferGetMaxItemSize(RingbufHandle_t xRingbuffer);
 size_t xRingbufferGetCurFreeSize(RingbufHandle_t xRingbuffer);
 
 /**
+ * @brief   Get current free size available for an item/data in the buffer from ISR
+ *
+ * This gives the real time free space available for an item/data in the ring
+ * buffer. This represents the maximum size an item/data can have if it was
+ * currently sent to the ring buffer.
+ *
+ * @note    An empty no-split buffer has a max current free size for an item
+ *          that is limited to ((buffer_size/2)-header_size). See API reference
+ *          for xRingbufferGetMaxItemSize().
+ *
+ * @param[in]   xRingbuffer     Ring buffer to query
+ *
+ * @return  Current free size, in bytes, available for an entry
+ */
+size_t xRingbufferGetCurFreeSizeFromISR(RingbufHandle_t xRingbuffer);
+
+/**
  * @brief   Add the ring buffer to a queue set. Notified when data has been written to the ring buffer
  *
  * This function adds the ring buffer to a queue set, thus allowing a task to

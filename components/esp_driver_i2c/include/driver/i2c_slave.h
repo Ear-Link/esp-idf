@@ -184,6 +184,21 @@ typedef struct {
  */
 esp_err_t i2c_slave_write(i2c_slave_dev_handle_t i2c_slave, const uint8_t *data, uint32_t len, uint32_t *write_len, int timeout_ms);
 
+/**
+ * @brief Write buffer to hardware fifo from ISR. If write length is larger than hardware fifo, then restore in software buffer.
+ *
+ * @param[in] i2c_slave I2C slave device handle that created by `i2c_new_slave_device`.
+ * @param[in] data Buffer to write to slave fifo, can pickup by master.
+ * @param[in] len In bytes, of `data` buffer.
+ * @param[out] write_len In bytes, actually write length.
+ * @param[out] pxHigherPriorityTaskWoken Value pointed to will be set to pdTRUE if the function woke up a higher priority task.
+ * @return
+ *      - ESP_OK: I2C slave write success.
+ *      - ESP_ERR_INVALID_ARG: I2C slave write parameter invalid.
+ *      - ESP_ERR_TIMEOUT: Operation timeout because the device is busy or hardware crash.
+ */
+esp_err_t i2c_slave_write_from_isr(i2c_slave_dev_handle_t i2c_slave, const uint8_t *data, uint32_t len, uint32_t *write_len, BaseType_t *pxHigherPriorityTaskWoken);
+
 #endif // CONFIG_I2C_ENABLE_SLAVE_DRIVER_VERSION_2
 
 /**
