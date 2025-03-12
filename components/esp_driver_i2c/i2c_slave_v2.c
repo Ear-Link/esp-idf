@@ -512,3 +512,37 @@ esp_err_t i2c_slave_register_event_callbacks(i2c_slave_dev_handle_t i2c_slave, c
     i2c_slave->receive_callback = cbs->on_receive;
     return ESP_OK;
 }
+
+esp_err_t i2c_slave_clear_output_from_isr(i2c_slave_dev_handle_t i2c_slave, BaseType_t *pxHigherPriorityTaskWoken)
+{
+    uint8_t *existing_data = NULL;
+    size_t existing_size = 0;
+    i2c_hal_context_t *hal = &i2c_slave->base->hal;
+
+    // Attempt to take the operation mutex (non-blocking in ISR)
+    if (xSemaphoreTakeFromISR(i2c_slave->operation_mux, pxHigherPriorityTaskWoken) != pdTRUE) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    // Clear TX FIFO
+    portENTER_CRITICAL_ISR(&i2c_slave->base->spinlock);
+    i2c_ll_slave_disable_tx_it(hal->dev);
+    i2c_ll_txfifo_rst(hal->dev);
+    portEXIT_CRITICAL_ISR(&i2c_slave->base->spinlock);
+
+    while ((existing_data = xRingbufferReceiveFromISR(i2c_slave->tx_ring_buf, &existing_size)) != NULL) {
+        // Free the received item
+        vRingbufferReturnItemFromISR(i2c_slave->tx_ring_buf, existing_data, pxHigherPriorityTaskWoken);
+    }
+
+    // Enable TX interrupt and clear stretch
+    portENTER_CRITICAL_ISR(&i2c_slave->base->spinlock);
+    i2c_ll_slave_enable_tx_it(hal->dev);
+    i2c_ll_slave_clear_stretch(hal->dev);
+    portEXIT_CRITICAL_ISR(&i2c_slave->base->spinlock);
+
+    // Release the operation mutex (non-blocking in ISR)
+    xSemaphoreGiveFromISR(i2c_slave->operation_mux, pxHigherPriorityTaskWoken);
+
+    return ESP_OK;
+}

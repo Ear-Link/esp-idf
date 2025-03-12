@@ -240,6 +240,17 @@ esp_err_t i2c_slave_register_event_callbacks(i2c_slave_dev_handle_t i2c_slave, c
  */
 esp_err_t i2c_del_slave_device(i2c_slave_dev_handle_t i2c_slave);
 
+/**
+ * @brief Clear TX FIFO and TX RingBuffer from ISR.
+ *
+ * @param[in] i2c_slave I2C slave device handle that created by `i2c_new_slave_device`.
+ * @param[out] pxHigherPriorityTaskWoken Value pointed to will be set to pdTRUE if the function woke up a higher priority task.
+ * @return
+ *      - ESP_OK: Clear output successfully.
+ *      - ESP_ERR_TIMEOUT: Operation timeout because the device is busy or hardware crash.
+ */
+esp_err_t i2c_slave_clear_output_from_isr(i2c_slave_dev_handle_t i2c_slave, BaseType_t *pxHigherPriorityTaskWoken);
+
 #ifdef __cplusplus
 }
 #endif
