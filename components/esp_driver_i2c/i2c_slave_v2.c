@@ -524,7 +524,7 @@ esp_err_t i2c_slave_register_event_callbacks(i2c_slave_dev_handle_t i2c_slave, c
     return ESP_OK;
 }
 
-esp_err_t i2c_slave_clear_output_from_isr(i2c_slave_dev_handle_t i2c_slave, BaseType_t *pxHigherPriorityTaskWoken)Add commentMore actions
+esp_err_t i2c_slave_clear_output_from_isr(i2c_slave_dev_handle_t i2c_slave, BaseType_t *pxHigherPriorityTaskWoken)
 {
     uint8_t *existing_data = NULL;
     size_t existing_size = 0;
@@ -555,5 +555,5 @@ esp_err_t i2c_slave_clear_output_from_isr(i2c_slave_dev_handle_t i2c_slave, Base
     // Release the operation mutex (non-blocking in ISR)
     xSemaphoreGiveFromISR(i2c_slave->operation_mux, pxHigherPriorityTaskWoken);
 
-    return ESP_OK;Add commentMore actions
+    return ESP_OK;
 }
