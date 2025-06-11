@@ -308,6 +308,16 @@ extern "C" {
     } while(0)
 
 /**
+ * A silent version of ESP_RETURN_ON_ERROR() macro.
+ */
+#define ESP_RETURN_ON_ERROR_SILENT(x, log_tag, format, ...) do {                                \
+        esp_err_t err_rc_ = (x);                                                                \
+        if (unlikely(err_rc_ != ESP_OK)) {                                                      \
+            return err_rc_;                                                                     \
+        }                                                                                       \
+    } while(0)
+
+/**
  * A version of ESP_RETURN_ON_ERROR() macro that can be called from ISR.
  */
 #define ESP_RETURN_ON_ERROR_ISR(x, log_tag, format, ...) do {                                   \
@@ -349,6 +359,17 @@ extern "C" {
         esp_err_t err_rc_ = (x);                                                                \
         if (unlikely(err_rc_ != ESP_OK)) {                                                      \
             ESP_LOGE(log_tag, "%s(%d): " format, __FUNCTION__, __LINE__, ##__VA_ARGS__);        \
+            ret = err_rc_;                                                                      \
+            goto goto_tag;                                                                      \
+        }                                                                                       \
+    } while(0)
+
+/**
+ * A silent version of ESP_GOTO_ON_ERROR() macro.
+ */
+#define ESP_GOTO_ON_ERROR_SILENT(x, goto_tag, log_tag, format, ...) do {                        \
+        esp_err_t err_rc_ = (x);                                                                \
+        if (unlikely(err_rc_ != ESP_OK)) {                                                      \
             ret = err_rc_;                                                                      \
             goto goto_tag;                                                                      \
         }                                                                                       \
