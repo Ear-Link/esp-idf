@@ -156,7 +156,7 @@ static void s_i2c_err_log_print(i2c_master_event_t event, bool bypass_nack_log)
     }
     if (bypass_nack_log != true) {
         if (event == I2C_EVENT_NACK) {
-            ESP_LOGE(TAG, "I2C transaction unexpected nack detected");
+            // ESP_LOGE(TAG, "I2C transaction unexpected nack detected");
         }
     }
 }
@@ -506,7 +506,7 @@ static void s_i2c_send_commands(i2c_master_bus_handle_t i2c_master, TickType_t t
         }
 
         if (atomic_load(&i2c_master->status) == I2C_STATUS_ACK_ERROR) {
-            ESP_LOGE(TAG, "I2C hardware NACK detected");
+            // ESP_LOGE(TAG, "I2C hardware NACK detected");
             const i2c_ll_hw_cmd_t hw_stop_cmd = {
                 .op_code = I2C_LL_CMD_STOP,
             };
@@ -945,7 +945,7 @@ static esp_err_t s_i2c_synchronous_transaction(i2c_master_dev_handle_t i2c_dev, 
     i2c_dev->master_bus->trans_finish = false;
     i2c_dev->master_bus->queue_trans = false;
     i2c_dev->master_bus->ack_check_disable = i2c_dev->ack_check_disable;
-    ESP_GOTO_ON_ERROR(s_i2c_transaction_start(i2c_dev, timeout_ms), err, TAG, "I2C transaction failed");
+    ESP_GOTO_ON_ERROR_SILENT(s_i2c_transaction_start(i2c_dev, timeout_ms), err, TAG, "I2C transaction failed");
     xSemaphoreGive(i2c_dev->master_bus->bus_lock_mux);
     return ret;
 
@@ -1214,9 +1214,9 @@ esp_err_t i2c_master_multi_buffer_transmit(i2c_master_dev_handle_t i2c_dev, i2c_
 
     i2c_ops[op_index++].hw_cmd.op_code = I2C_LL_CMD_STOP;
     if (i2c_dev->master_bus->async_trans == false) {
-        ESP_RETURN_ON_ERROR(s_i2c_synchronous_transaction(i2c_dev, i2c_ops, op_index, xfer_timeout_ms), TAG, "I2C transaction failed");
+        ESP_RETURN_ON_ERROR_SILENT(s_i2c_synchronous_transaction(i2c_dev, i2c_ops, op_index, xfer_timeout_ms), TAG, "I2C transaction failed");
     } else {
-        ESP_RETURN_ON_ERROR(s_i2c_asynchronous_transaction(i2c_dev, i2c_ops, op_index, xfer_timeout_ms), TAG, "I2C transaction failed");
+        ESP_RETURN_ON_ERROR_SILENT(s_i2c_asynchronous_transaction(i2c_dev, i2c_ops, op_index, xfer_timeout_ms), TAG, "I2C transaction failed");
     }
     return ESP_OK;
 }
