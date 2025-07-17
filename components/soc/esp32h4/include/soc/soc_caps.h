@@ -64,16 +64,18 @@
 // #define SOC_ECC_SUPPORTED               1    // TODO: [ESP32H4] IDF-12264
 #define SOC_FLASH_ENC_SUPPORTED         1       // TODO: [ESP32H4] IDF-12261
 // #define SOC_SECURE_BOOT_SUPPORTED       1    // TODO: [ESP32H4] IDF-12262
+#define SOC_MODEM_CLOCK_SUPPORTED       1
 
 // #define SOC_BOD_SUPPORTED               1    // TODO: [ESP32H4] IDF-12295
 // #define SOC_APM_SUPPORTED               1    // TODO: [ESP32H4] IDF-12256
-// #define SOC_PMU_SUPPORTED               1    // TODO: [ESP32H4] IDF-12286
-// #define SOC_PAU_SUPPORTED               1
-// #define SOC_LP_TIMER_SUPPORTED          1    // TODO: [ESP32H4] IDF-12274
+#define SOC_PMU_SUPPORTED               1    // TODO: [ESP32H4] IDF-12286
+#define SOC_PAU_SUPPORTED               1
+#define SOC_LP_TIMER_SUPPORTED          1
 // #define SOC_LP_AON_SUPPORTED            1
 // #define SOC_LP_PERIPHERALS_SUPPORTED    1
 // #define SOC_LP_I2C_SUPPORTED            1    // TODO: [ESP32H4] IDF-12449
 // #define SOC_ULP_LP_UART_SUPPORTED       1    // TODO: [ESP32H4] IDF-12445 IDF-12451
+#define SOC_REG_I2C_SUPPORTED           1
 // #define SOC_CLK_TREE_SUPPORTED          1    // TODO: [ESP32H4] IDF-12285
 // #define SOC_ASSIST_DEBUG_SUPPORTED      1    // TODO: [ESP32H4] IDF-12310
 #define SOC_WDT_SUPPORTED               1
@@ -426,8 +428,8 @@
 // #define SOC_SYSTIMER_SUPPORT_ETM            1  // Systimer comparator can generate ETM event
 
 /*-------------------------- LP_TIMER CAPS ----------------------------------*/
-// #define SOC_LP_TIMER_BIT_WIDTH_LO           32 // Bit width of lp_timer low part
-// #define SOC_LP_TIMER_BIT_WIDTH_HI           16 // Bit width of lp_timer high part
+#define SOC_LP_TIMER_BIT_WIDTH_LO           32 // Bit width of lp_timer low part
+#define SOC_LP_TIMER_BIT_WIDTH_HI           16 // Bit width of lp_timer high part
 
 /*--------------------------- TIMER GROUP CAPS ---------------------------------------*/
 #define SOC_TIMER_GROUPS                  (2)
@@ -506,18 +508,17 @@
 
 // TODO: IDF-12286 (inherit from verify code, need check)
 /*-------------------------- Power Management CAPS ----------------------------*/
-#define SOC_PM_SUPPORT_BEACON_WAKEUP    (1)
 #define SOC_PM_SUPPORT_BT_WAKEUP        (1)
-#define SOC_PM_SUPPORT_EXT1_WAKEUP      (1)
+// #define SOC_PM_SUPPORT_EXT1_WAKEUP      (1)
 #define SOC_PM_SUPPORT_EXT1_WAKEUP_MODE_PER_PIN   (1) /*!<Supports one bit per pin to configure the EXT1 trigger level */
 #define SOC_PM_SUPPORT_TOUCH_WAKEUP     (1)
-#define SOC_PM_SUPPORT_CPU_PD           (1)
+// #define SOC_PM_SUPPORT_CPU_PD           (1)
 #define SOC_PM_SUPPORT_MODEM_PD         (1)
 #define SOC_PM_SUPPORT_XTAL32K_PD       (1)
 #define SOC_PM_SUPPORT_RC32K_PD         (1)
 #define SOC_PM_SUPPORT_RC_FAST_PD       (1)
 #define SOC_PM_SUPPORT_VDDSDIO_PD       (1)
-#define SOC_PM_SUPPORT_TOP_PD           (1)
+// #define SOC_PM_SUPPORT_TOP_PD           (1)
 #define SOC_PM_SUPPORT_HP_AON_PD        (1)
 #define SOC_PM_SUPPORT_MAC_BB_PD        (1)
 #define SOC_PM_SUPPORT_RTC_PERIPH_PD    (1)
@@ -530,7 +531,9 @@
 // #define SOC_PM_MODEM_RETENTION_BY_REGDMA    (1)
 // #define SOC_PM_RETENTION_HAS_CLOCK_BUG      (1)
 
-#define SOC_PM_PAU_LINK_NUM             (4)
+#define SOC_PM_PAU_LINK_NUM                 (4)
+#define SOC_PM_PAU_REGDMA_LINK_CONFIGURABLE (1)
+#define SOC_PM_RETENTION_MODULE_NUM         (32)
 
 /*-------------------------- CLOCK SUBSYSTEM CAPS ----------------------------------------*/
 // #define SOC_CLK_RC_FAST_SUPPORT_CALIBRATION       (1)  // TODO: [ESP32H4] IDF-12285

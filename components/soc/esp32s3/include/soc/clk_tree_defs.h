@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2022-2024 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2022-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -54,6 +54,13 @@ typedef enum {
     SOC_ROOT_CLK_EXT_XTAL,             /*!< External 40MHz crystal */
     SOC_ROOT_CLK_EXT_XTAL32K,          /*!< External 32kHz crystal/clock signal */
 } soc_root_clk_t;
+
+/**
+ * @brief ROOT clock circuit, which requires explicitly enabling the targeting circuit to use
+ */
+typedef enum {
+    SOC_ROOT_CIRCUIT_CLK_BBPLL,         /*!< BBPLL_CLK is the output of the BBPLL generator circuit */
+} soc_root_clk_circuit_t;
 
 /**
  * @brief CPU_CLK mux inputs, which are the supported clock sources for the CPU_CLK
@@ -189,6 +196,23 @@ typedef enum {
     LCD_CLK_SRC_XTAL = SOC_MOD_CLK_XTAL,         /*!< Select XTAL as the source clock */
     LCD_CLK_SRC_DEFAULT = SOC_MOD_CLK_PLL_F160M, /*!< Select PLL_F160M as the default choice */
 } soc_periph_lcd_clk_src_t;
+
+//////////////////////////////////////////////////LCD///////////////////////////////////////////////////////////////////
+
+/**
+ * @brief Array initializer for all supported clock sources of CAM
+ */
+#define SOC_CAM_CLKS {SOC_MOD_CLK_PLL_F160M, SOC_MOD_CLK_PLL_D2, SOC_MOD_CLK_XTAL}
+
+/**
+ * @brief Type of CAM clock source
+ */
+typedef enum {
+    CAM_CLK_SRC_PLL160M = SOC_MOD_CLK_PLL_F160M, /*!< Select PLL_F160M as the source clock */
+    CAM_CLK_SRC_PLL240M = SOC_MOD_CLK_PLL_D2,    /*!< Select PLL_D2 as the source clock */
+    CAM_CLK_SRC_XTAL = SOC_MOD_CLK_XTAL,         /*!< Select XTAL as the source clock */
+    CAM_CLK_SRC_DEFAULT = SOC_MOD_CLK_PLL_D2,    /*!< Select PLL_D2 as the default choice */
+} soc_periph_cam_clk_src_t;
 
 //////////////////////////////////////////////////RMT///////////////////////////////////////////////////////////////////
 

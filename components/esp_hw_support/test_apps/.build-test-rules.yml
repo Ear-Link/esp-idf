@@ -42,13 +42,17 @@ components/esp_hw_support/test_apps/rtc_power_modes:
 
 components/esp_hw_support/test_apps/sleep_retention:
   enable:
-    - if: SOC_PAU_SUPPORTED == 1 and SOC_LIGHT_SLEEP_SUPPORTED == 1 and CONFIG_NAME != "xip_psram"
-    - if: SOC_PAU_SUPPORTED == 1 and SOC_LIGHT_SLEEP_SUPPORTED == 1 and (SOC_SPIRAM_XIP_SUPPORTED == 1 and CONFIG_NAME == "xip_psram")
+    - if: SOC_PAU_SUPPORTED == 1 and SOC_LIGHT_SLEEP_SUPPORTED == 1 and SOC_PM_CPU_RETENTION_BY_SW == 1 and CONFIG_NAME != "xip_psram"
+    - if: SOC_PAU_SUPPORTED == 1 and SOC_LIGHT_SLEEP_SUPPORTED == 1 and SOC_PM_CPU_RETENTION_BY_SW == 1 and (SOC_SPIRAM_XIP_SUPPORTED == 1 and CONFIG_NAME == "xip_psram")
 
 components/esp_hw_support/test_apps/vad_wakeup:
   disable:
     - if: SOC_LP_VAD_SUPPORTED != 1
 
 components/esp_hw_support/test_apps/wakeup_tests:
-  disable:
-    - if: IDF_TARGET in ["esp32c5", "esp32p4", "linux", "esp32c61", "esp32h21", "esp32h4"]   # TODO: PM-337
+  enable:
+    - if: SOC_DEEP_SLEEP_SUPPORTED == 1 and SOC_LIGHT_SLEEP_SUPPORTED == 1
+  disable_test:
+    - if: IDF_TARGET in ["esp32c61", "esp32h21", "esp32h4"]
+      temporary: true
+      reason: lack of runners

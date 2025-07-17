@@ -17,6 +17,8 @@ entries:
         rtc_clk (noflash)
         rtc_time (noflash_text)
         esp_clk_tree: esp_clk_tree_enable_src (noflash)
+        esp_clk_tree: esp_clk_tree_enable_power (noflash)
+        esp_clk_tree: esp_clk_tree_is_power_on (noflash)
     if IDF_TARGET_ESP32 = y:
         rtc_clk:rtc_clk_cpu_freq_to_pll_mhz (noflash)
         rtc_clk:rtc_clk_cpu_freq_to_xtal (noflash)
@@ -41,6 +43,8 @@ entries:
         elif PM_SLP_IRAM_OPT = y && IDF_TARGET_ESP32P4 != y:
             pmu_param:get_act_hp_dbias (noflash)
             pmu_param:get_act_lp_dbias (noflash)
+    if SOC_PMU_PVT_SUPPORTED = y:
+        pmu_pvt (noflash)
     if PM_SLP_IRAM_OPT = y && SOC_USB_SERIAL_JTAG_SUPPORTED = y:
         sleep_console (noflash)
     if PM_SLP_IRAM_OPT = y && SOC_USB_OTG_SUPPORTED && SOC_PM_SUPPORT_CNNT_PD = y:

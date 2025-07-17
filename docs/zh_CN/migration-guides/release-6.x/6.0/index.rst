@@ -6,4 +6,10 @@
 .. toctree::
     :maxdepth: 1
 
+    build-system
     peripherals
+    provisioning
+    security
+    tools
+    system
+    toolchain

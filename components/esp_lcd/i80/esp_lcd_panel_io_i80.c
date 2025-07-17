@@ -199,7 +199,9 @@ esp_err_t esp_lcd_new_i80_bus(const esp_lcd_i80_bus_config_t *bus_config, esp_lc
                                     (uint32_t)lcd_ll_get_interrupt_status_reg(bus->hal.dev),
                                     LCD_LL_EVENT_TRANS_DONE, i80_lcd_default_isr_handler, bus, &bus->intr);
     ESP_GOTO_ON_ERROR(ret, err, TAG, "install interrupt failed");
-    lcd_ll_enable_interrupt(bus->hal.dev, LCD_LL_EVENT_TRANS_DONE, false); // disable all interrupts
+    PERIPH_RCC_ATOMIC() {
+        lcd_ll_enable_interrupt(bus->hal.dev, LCD_LL_EVENT_TRANS_DONE, false); // disable all interrupts
+    }
     lcd_ll_clear_interrupt_status(bus->hal.dev, UINT32_MAX); // clear pending interrupt
     // install DMA service
     bus->max_transfer_bytes = bus_config->max_transfer_bytes;
@@ -215,8 +217,10 @@ esp_err_t esp_lcd_new_i80_bus(const esp_lcd_i80_bus_config_t *bus_config, esp_lc
     lcd_ll_set_swizzle_mode(bus->hal.dev, LCD_LL_SWIZZLE_AB2BA);
     // number of data cycles is controlled by DMA buffer size
     lcd_ll_enable_output_always_on(bus->hal.dev, true);
-    // enable trans done interrupt
-    lcd_ll_enable_interrupt(bus->hal.dev, LCD_LL_EVENT_TRANS_DONE, true);
+    PERIPH_RCC_ATOMIC() {
+        // enable trans done interrupt
+        lcd_ll_enable_interrupt(bus->hal.dev, LCD_LL_EVENT_TRANS_DONE, true);
+    }
     // trigger a quick "trans done" event, and wait for the interrupt line goes active
     // this could ensure we go into ISR handler next time we call `esp_intr_enable`
     lcd_periph_trigger_quick_trans_done_event(bus);
@@ -527,19 +531,16 @@ static esp_err_t panel_io_i80_tx_color(esp_lcd_panel_io_t *io, int lcd_cmd, cons
     esp_lcd_i80_bus_t *bus = i80_device->bus;
     lcd_i80_trans_descriptor_t *trans_desc = NULL;
     assert(color_size <= bus->max_transfer_bytes && "color bytes too long, enlarge max_transfer_bytes");
-    uint32_t cache_line_size = 0;
     if (esp_ptr_external_ram(color)) {
         // check alignment
         ESP_RETURN_ON_FALSE(((uint32_t)color & (bus->ext_mem_align - 1)) == 0, ESP_ERR_INVALID_ARG, TAG, "color address not aligned");
         ESP_RETURN_ON_FALSE((color_size & (bus->ext_mem_align - 1)) == 0, ESP_ERR_INVALID_ARG, TAG, "color size not aligned");
-        cache_line_size = cache_hal_get_cache_line_size(CACHE_LL_LEVEL_EXT_MEM, CACHE_TYPE_DATA);
     } else {
         // check alignment
         ESP_RETURN_ON_FALSE(((uint32_t)color & (bus->int_mem_align - 1)) == 0, ESP_ERR_INVALID_ARG, TAG, "color address not aligned");
         ESP_RETURN_ON_FALSE((color_size & (bus->int_mem_align - 1)) == 0, ESP_ERR_INVALID_ARG, TAG, "color size not aligned");
-        cache_line_size = cache_hal_get_cache_line_size(CACHE_LL_LEVEL_INT_MEM, CACHE_TYPE_DATA);
     }
-    if (cache_line_size > 0) {
+    if (esp_cache_get_line_size_by_addr(color) > 0) {
         // flush data from cache to the physical memory
         esp_cache_msync((void *)color, color_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
     }

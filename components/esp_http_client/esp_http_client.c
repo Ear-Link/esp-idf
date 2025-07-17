@@ -34,6 +34,8 @@ static const char *TAG = "HTTP_CLIENT";
 
 ESP_STATIC_ASSERT((int)ESP_HTTP_CLIENT_TLS_VER_ANY == (int)ESP_TLS_VER_ANY, "Enum mismatch in esp_http_client and esp-tls");
 ESP_STATIC_ASSERT((int)ESP_HTTP_CLIENT_TLS_VER_MAX <= (int)ESP_TLS_VER_TLS_MAX, "HTTP client supported TLS is not supported in esp-tls");
+ESP_STATIC_ASSERT((int)HTTP_TLS_DYN_BUF_RX_STATIC == (int)ESP_TLS_DYN_BUF_RX_STATIC, "Enum mismatch in esp_http_client and esp-tls");
+ESP_STATIC_ASSERT((int)HTTP_TLS_DYN_BUF_STRATEGY_MAX <= (int)ESP_TLS_DYN_BUF_STRATEGY_MAX, "HTTP client supported TLS is not supported in esp-tls");
 
 #if CONFIG_ESP_HTTP_CLIENT_EVENT_POST_TIMEOUT == -1
 #define ESP_HTTP_CLIENT_EVENT_POST_TIMEOUT portMAX_DELAY
@@ -65,6 +67,7 @@ typedef struct {
     int64_t             data_process;   /*!< data processed */
     int                 method;         /*!< http method */
     bool                is_chunked;
+    int64_t             content_range;  /*!< content range */
 } esp_http_data_t;
 
 typedef struct {
@@ -267,7 +270,29 @@ static int http_on_header_value(http_parser *parser, const char *at, size_t leng
     if (client->current_header_key == NULL) {
         return 0;
     }
-    if (strcasecmp(client->current_header_key, "Location") == 0) {
+    if (strcasecmp(client->current_header_key, "Content-Range") == 0) {
+        HTTP_RET_ON_FALSE_DBG(http_utils_append_string(&client->current_header_value, at, length), -1, TAG, "Failed to append string");
+
+        int64_t total_size = -1;
+        client->response->content_range = -1;
+        char *slash_pos = strchr(client->current_header_value, '/');
+
+        if (slash_pos) {
+            if (slash_pos[1] == '*') {
+                ESP_LOGE(TAG, "Content-Range header has unknown total size (bytes A-B/*)");
+            } else {
+                char *endptr;
+                total_size = strtol(slash_pos + 1, &endptr, 10);
+                if (total_size > 0 && *endptr == '\0') {
+                    client->response->content_range = total_size;
+                } else {
+                    ESP_LOGE(TAG, "Failed to extract total size from Content-Range");
+                }
+            }
+        } else {
+            ESP_LOGE(TAG, "Invalid Content-Range format (missing '/')");
+        }
+    } else if (strcasecmp(client->current_header_key, "Location") == 0) {
         HTTP_RET_ON_FALSE_DBG(http_utils_append_string(&client->location, at, length), -1, TAG, "Failed to append string");
     } else if (strcasecmp(client->current_header_key, "Transfer-Encoding") == 0
                && memcmp(at, "chunked", length) == 0) {
@@ -289,6 +314,8 @@ static int http_on_headers_complete(http_parser *parser)
     client->response->data_process = 0;
     ESP_LOGD(TAG, "http_on_headers_complete, status=%d, offset=%d, nread=%" PRId32, parser->status_code, client->response->data_offset, parser->nread);
     client->state = HTTP_STATE_RES_COMPLETE_HEADER;
+    http_dispatch_event(client, HTTP_EVENT_ON_HEADERS_COMPLETE, NULL, 0);
+    http_dispatch_event_to_event_loop(HTTP_EVENT_ON_HEADERS_COMPLETE, &client, sizeof(esp_http_client_handle_t));
     if (client->connection_info.method == HTTP_METHOD_HEAD) {
         /* In a HTTP_RESPONSE parser returning '1' from on_headers_complete will tell the
            parser that it should not expect a body. This is used when receiving a response
@@ -841,6 +868,14 @@ esp_http_client_handle_t esp_http_client_init(const esp_http_client_config_t *co
         }
     }
     esp_transport_ssl_set_tls_version(ssl, config->tls_version);
+
+#if CONFIG_MBEDTLS_DYNAMIC_BUFFER
+    /* When tls_dyn_buf_strategy is 0, mbedTLS dynamic buffer allocation uses default behavior.
+     * No need to call esp_transport_ssl_set_esp_tls_dyn_buf_strategy() in this case */
+    if (config->tls_dyn_buf_strategy != 0 && config->tls_dyn_buf_strategy < HTTP_TLS_DYN_BUF_STRATEGY_MAX) {
+        esp_transport_ssl_set_esp_tls_dyn_buf_strategy(ssl, config->tls_dyn_buf_strategy);
+    }
+#endif
 
 #if CONFIG_ESP_TLS_USE_SECURE_ELEMENT
     if (config->use_secure_element) {
@@ -1803,6 +1838,11 @@ int esp_http_client_get_status_code(esp_http_client_handle_t client)
 int64_t esp_http_client_get_content_length(esp_http_client_handle_t client)
 {
     return client->response->content_length;
+}
+
+int64_t esp_http_client_get_content_range(esp_http_client_handle_t client)
+{
+    return client->response->content_range;
 }
 
 bool esp_http_client_is_chunked_response(esp_http_client_handle_t client)
