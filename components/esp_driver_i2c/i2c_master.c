@@ -82,6 +82,8 @@ static esp_err_t s_i2c_master_clear_bus(i2c_bus_handle_t handle)
     gpio_set_level(handle->scl_num, 1);
     esp_rom_delay_us(scl_half_period);
     gpio_set_level(handle->sda_num, 1); // STOP, SDA low -> high while SCL is HIGH
+    // deinit pins before initializing them to prevent GPIO driver from
+    // calling esp_gpio_reserve on already reserved pins
     i2c_common_deinit_pins(handle);
     i2c_common_set_pins(handle);
 #else
