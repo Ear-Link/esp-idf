@@ -674,6 +674,13 @@ I2C_MASTER_ISR_ATTR static void i2c_isr_receive_handler(i2c_master_bus_t *i2c_ma
 
     if (atomic_load(&i2c_master->status) == I2C_STATUS_READ) {
         i2c_operation_t *i2c_operation = &i2c_master->i2c_trans.ops[i2c_master->trans_idx];
+        if (i2c_operation->data == NULL) {
+            // i2c_operation->data equals NULL, nowhere to write received data.
+            // moreover, rxfifo_cnt equals 0, no data to read.
+            // the origin of this error is unknown, but is is connected with receiving NACK.
+            // it is safe to exit here, because no data was read because of NACK.
+            return;
+        }
         portENTER_CRITICAL_ISR(&i2c_master->base->spinlock);
         i2c_ll_read_rxfifo(hal->dev, i2c_operation->data + i2c_operation->bytes_used, i2c_master->rx_cnt);
         /* rx_cnt bytes have just been read, increment the number of bytes used from the buffer */
