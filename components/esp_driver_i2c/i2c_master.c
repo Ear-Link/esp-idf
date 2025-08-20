@@ -82,6 +82,9 @@ static esp_err_t s_i2c_master_clear_bus(i2c_bus_handle_t handle)
     gpio_set_level(handle->scl_num, 1);
     esp_rom_delay_us(scl_half_period);
     gpio_set_level(handle->sda_num, 1); // STOP, SDA low -> high while SCL is HIGH
+    // deinit pins before initializing them to prevent GPIO driver from
+    // calling esp_gpio_reserve on already reserved pins
+    i2c_common_deinit_pins(handle);
     i2c_common_set_pins(handle);
 #else
     i2c_hal_context_t *hal = &handle->hal;
@@ -673,6 +676,13 @@ I2C_MASTER_ISR_ATTR static void i2c_isr_receive_handler(i2c_master_bus_t *i2c_ma
 
     if (atomic_load(&i2c_master->status) == I2C_STATUS_READ) {
         i2c_operation_t *i2c_operation = &i2c_master->i2c_trans.ops[i2c_master->trans_idx];
+        if (i2c_operation->data == NULL) {
+            // i2c_operation->data equals NULL, nowhere to write received data.
+            // moreover, rxfifo_cnt equals 0, no data to read.
+            // the origin of this error is unknown, but is is connected with receiving NACK.
+            // it is safe to exit here, because no data was read because of NACK.
+            return;
+        }
         portENTER_CRITICAL_ISR(&i2c_master->base->spinlock);
         i2c_ll_read_rxfifo(hal->dev, i2c_operation->data + i2c_operation->bytes_used, i2c_master->rx_cnt);
         /* rx_cnt bytes have just been read, increment the number of bytes used from the buffer */
