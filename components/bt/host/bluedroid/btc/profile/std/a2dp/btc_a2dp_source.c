@@ -38,6 +38,7 @@
 #include "esp_a2dp_api.h"
 #include "osi/future.h"
 #include <assert.h>
+#include "esp_log.h"
 
 #if (BTC_AV_SRC_INCLUDED == TRUE) && (BTC_AV_EXT_CODEC == FALSE)
 
@@ -72,6 +73,7 @@ enum {
     BTC_A2DP_SOURCE_STATE_SHUTTING_DOWN = 2
 };
 
+static const char *TAG = "BTC_A2DP_SOURCE";
 
 /* Media task tick in milliseconds, must be set to multiple of
    (1000/TICKS_PER_SEC) */
@@ -1322,9 +1324,21 @@ static void btc_media_aa_prep_sbc_2_send(UINT8 nb_frame)
                              a2dp_source_local_param.btc_aa_src_cb.encoder.s16NumOfBlocks;
 
     while (nb_frame) {
-        if (NULL == (p_buf = osi_malloc(BTC_MEDIA_AA_BUF_SIZE))) {
-            APPL_TRACE_ERROR ("ERROR btc_media_aa_prep_sbc_2_send no buffer TxCnt %d ",
-                              fixed_queue_length(a2dp_source_local_param.btc_aa_src_cb.TxAaQ));
+        // try to allocate memory for the audio buffer
+        p_buf = osi_malloc(BTC_MEDIA_AA_BUF_SIZE);
+        while (p_buf == NULL && !fixed_queue_is_empty(a2dp_source_local_param.btc_aa_src_cb.TxAaQ)) {
+            // malloc failed, drop the oldest buffer in the queue
+            BT_HDR *old = fixed_queue_dequeue(a2dp_source_local_param.btc_aa_src_cb.TxAaQ, 0);
+            if (old) {
+                ESP_EARLY_LOGW(TAG, "malloc fail, dropped 1 buf (q=%d)",
+                    fixed_queue_length(a2dp_source_local_param.btc_aa_src_cb.TxAaQ));
+                osi_free(old);
+            }
+            p_buf = osi_malloc(BTC_MEDIA_AA_BUF_SIZE);
+        }
+        if (p_buf == NULL) {
+            // malloc failed and queue is empty, drop this frame
+            ESP_EARLY_LOGE(TAG, "malloc fail, queue empty, drop frame");
             return;
         }
 
