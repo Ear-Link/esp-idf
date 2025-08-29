@@ -38,6 +38,7 @@
 #include "esp_a2dp_api.h"
 #include "osi/future.h"
 #include <assert.h>
+#include "esp_log.h"
 
 #if (BTC_AV_SRC_INCLUDED == TRUE) && (BTC_AV_EXT_CODEC == FALSE)
 
@@ -72,17 +73,12 @@ enum {
     BTC_A2DP_SOURCE_STATE_SHUTTING_DOWN = 2
 };
 
+static const char *TAG = "BTC_A2DP_SOURCE";
 
 /* Media task tick in milliseconds, must be set to multiple of
    (1000/TICKS_PER_SEC) */
-#define BTC_MEDIA_TIME_TICK_MS                 (30)
+#define BTC_MEDIA_TIME_TICK_MS                 (20) // ex: 30 ms
 #define A2DP_DATA_READ_POLL_MS                 (BTC_MEDIA_TIME_TICK_MS / 2)
-
-#ifndef MAX_PCM_FRAME_NUM_PER_TICK
-#define MAX_PCM_FRAME_NUM_PER_TICK             21 // 14 for 20ms
-#endif
-
-#define BTC_MEDIA_AA_BUF_SIZE                  (4096+16)
 
 #ifndef BTC_MEDIA_BITRATE_STEP
 #define BTC_MEDIA_BITRATE_STEP                 5
@@ -116,7 +112,6 @@ enum {
 
 /* 5 frames is equivalent to 6.89*5*2.9 ~= 100 ms @ 44.1 khz, 20 ms mediatick */
 #define MAX_OUTPUT_A2DP_FRAME_QUEUE_SZ         (5)
-#define MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ     (27) // 18 for 20ms tick
 
 #define BTC_A2DP_SRC_DATA_QUEUE_IDX            (1)
 
@@ -1123,11 +1118,7 @@ static UINT8 btc_get_num_aa_frame(void)
         result = a2dp_source_local_param.btc_aa_src_cb.media_feeding_state.pcm.counter / pcm_bytes_per_frame;
 
         /* limit the frames to be sent */
-        UINT32 frm_nb_threshold = MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ - fixed_queue_length(a2dp_source_local_param.btc_aa_src_cb.TxAaQ);
-        if (frm_nb_threshold > MAX_PCM_FRAME_NUM_PER_TICK) {
-            frm_nb_threshold = MAX_PCM_FRAME_NUM_PER_TICK;
-        }
-
+        UINT32 frm_nb_threshold = MAX_PCM_FRAME_NUM_PER_TICK;
         if (result > frm_nb_threshold) {
             APPL_TRACE_EVENT("Limit frms to send from %d to %d", result, frm_nb_threshold);
             result = frm_nb_threshold;
@@ -1317,14 +1308,16 @@ BOOLEAN btc_media_aa_read_feeding(void)
  *******************************************************************************/
 static void btc_media_aa_prep_sbc_2_send(UINT8 nb_frame)
 {
+    ESP_EARLY_LOGD(
+        TAG, "nb_frame=%d, qlen=%d", nb_frame,
+        fixed_queue_length(a2dp_source_local_param.btc_aa_src_cb.TxAaQ));
+
     BT_HDR *p_buf;
     UINT16 blocm_x_subband = a2dp_source_local_param.btc_aa_src_cb.encoder.s16NumOfSubBands *
                              a2dp_source_local_param.btc_aa_src_cb.encoder.s16NumOfBlocks;
 
     while (nb_frame) {
-        if (NULL == (p_buf = osi_malloc(BTC_MEDIA_AA_BUF_SIZE))) {
-            APPL_TRACE_ERROR ("ERROR btc_media_aa_prep_sbc_2_send no buffer TxCnt %d ",
-                              fixed_queue_length(a2dp_source_local_param.btc_aa_src_cb.TxAaQ));
+        if (NULL == (p_buf = sbc_buffer_alloc())) {
             return;
         }
 
@@ -1388,8 +1381,12 @@ static void btc_media_aa_prep_sbc_2_send(UINT8 nb_frame)
                 return;
             }
 
-            /* Enqueue the encoded SBC frame in AA Tx Queue */
-            fixed_queue_enqueue(a2dp_source_local_param.btc_aa_src_cb.TxAaQ, p_buf, FIXED_QUEUE_MAX_TIMEOUT);
+            if (fixed_queue_length(a2dp_source_local_param.btc_aa_src_cb.TxAaQ) < MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ) {
+                /* Enqueue the encoded SBC frame in AA Tx Queue */
+                fixed_queue_enqueue(a2dp_source_local_param.btc_aa_src_cb.TxAaQ, p_buf, FIXED_QUEUE_MAX_TIMEOUT);
+            } else {
+                osi_free(p_buf);
+            }
         } else {
             osi_free(p_buf);
         }
@@ -1407,6 +1404,8 @@ static void btc_media_aa_prep_sbc_2_send(UINT8 nb_frame)
  *******************************************************************************/
 static void btc_a2dp_source_prep_2_send(UINT8 nb_frame)
 {
+    // No need to check for TX queue overflow here
+    /*
     // Check for TX queue overflow
     if (nb_frame > MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ) {
         nb_frame = MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ;
@@ -1420,6 +1419,7 @@ static void btc_a2dp_source_prep_2_send(UINT8 nb_frame)
     while (fixed_queue_length(a2dp_source_local_param.btc_aa_src_cb.TxAaQ) > (MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ - nb_frame)) {
         osi_free(fixed_queue_dequeue(a2dp_source_local_param.btc_aa_src_cb.TxAaQ, 0));
     }
+    */
 
     // Transcode frame
 

@@ -20,6 +20,14 @@
 #include "esp_a2dp_api.h"
 
 #if BTC_AV_SRC_INCLUDED
+
+// max number of PCM frames to be generated per tick
+#define MAX_PCM_FRAME_NUM_PER_TICK 14 // 14 for 20ms, 21 for 30ms
+// buffer size for SBC encoded data
+#define BTC_MEDIA_AA_BUF_SIZE (4096 + 16)
+// max number of frames in the tx queue
+#define MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ (1) // 18 for 20ms tick, 27 for 30ms
+
 /*******************************************************************************
  **  Data types
  *******************************************************************************/
