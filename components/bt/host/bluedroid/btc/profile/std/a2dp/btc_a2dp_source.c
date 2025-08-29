@@ -80,12 +80,6 @@ static const char *TAG = "BTC_A2DP_SOURCE";
 #define BTC_MEDIA_TIME_TICK_MS                 (20) // ex: 30 ms
 #define A2DP_DATA_READ_POLL_MS                 (BTC_MEDIA_TIME_TICK_MS / 2)
 
-#ifndef MAX_PCM_FRAME_NUM_PER_TICK
-#define MAX_PCM_FRAME_NUM_PER_TICK             7 // 14 for 20ms, 21 for 30ms
-#endif
-
-#define BTC_MEDIA_AA_BUF_SIZE                  (4096+16)
-
 #ifndef BTC_MEDIA_BITRATE_STEP
 #define BTC_MEDIA_BITRATE_STEP                 5
 #endif
@@ -118,8 +112,6 @@ static const char *TAG = "BTC_A2DP_SOURCE";
 
 /* 5 frames is equivalent to 6.89*5*2.9 ~= 100 ms @ 44.1 khz, 20 ms mediatick */
 #define MAX_OUTPUT_A2DP_FRAME_QUEUE_SZ         (5)
-// max number of frames in the tx queue
-#define MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ     (1) // 18 for 20ms tick, 27 for 30ms
 
 #define BTC_A2DP_SRC_DATA_QUEUE_IDX            (1)
 
@@ -1316,26 +1308,16 @@ BOOLEAN btc_media_aa_read_feeding(void)
  *******************************************************************************/
 static void btc_media_aa_prep_sbc_2_send(UINT8 nb_frame)
 {
+    ESP_EARLY_LOGD(
+        TAG, "nb_frame=%d, qlen=%d", nb_frame,
+        fixed_queue_length(a2dp_source_local_param.btc_aa_src_cb.TxAaQ));
+
     BT_HDR *p_buf;
     UINT16 blocm_x_subband = a2dp_source_local_param.btc_aa_src_cb.encoder.s16NumOfSubBands *
                              a2dp_source_local_param.btc_aa_src_cb.encoder.s16NumOfBlocks;
 
     while (nb_frame) {
-        // try to allocate memory for the audio buffer
-        p_buf = osi_malloc(BTC_MEDIA_AA_BUF_SIZE);
-        while (p_buf == NULL && !fixed_queue_is_empty(a2dp_source_local_param.btc_aa_src_cb.TxAaQ)) {
-            // malloc failed, drop the oldest buffer in the queue
-            BT_HDR *old = fixed_queue_dequeue(a2dp_source_local_param.btc_aa_src_cb.TxAaQ, 0);
-            if (old) {
-                ESP_EARLY_LOGW(TAG, "malloc fail, dropped 1 buf (q=%d)",
-                    fixed_queue_length(a2dp_source_local_param.btc_aa_src_cb.TxAaQ));
-                osi_free(old);
-            }
-            p_buf = osi_malloc(BTC_MEDIA_AA_BUF_SIZE);
-        }
-        if (p_buf == NULL) {
-            // malloc failed and queue is empty, drop this frame
-            ESP_EARLY_LOGE(TAG, "malloc fail, queue empty, drop frame");
+        if (NULL == (p_buf = sbc_buffer_alloc())) {
             return;
         }
 

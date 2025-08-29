@@ -19,7 +19,10 @@
 #include <string.h>
 
 #include "bt_common.h"
+#include "btc_a2dp_source.h"
+#include "esp_log.h"
 #include "osi/allocator.h"
+#include "osi/mutex.h"
 
 extern void *pvPortZalloc(size_t size);
 extern void vPortFree(void *pv);
@@ -245,4 +248,116 @@ void osi_free_func(void *ptr)
     osi_mem_dbg_clean(ptr, __func__, __LINE__);
 #endif
     free(ptr);
+}
+
+#define TAG "SBC_POOL"
+/**
+ * Preallocated SBC buffer pool
+ *
+ * (MAX_PCM_FRAME_NUM_PER_TICK + MAX_OUTPUT_A2DP_SRC_FRAME_QUEUE_SZ) - that's
+ * just too much
+ *
+ * 1 buffer is too low - sometimes we get "SBC buffer pool exhausted"
+ * 2 buffer is quite ok
+ * 7 or more buffers - too much memory is wasted, other tasks may starve
+ */
+#define SBC_BUFFER_POOL_SIZE 2
+
+// Each buffer should be BTC_MEDIA_AA_BUF_SIZE bytes total
+// We need to allocate the header + data area together
+typedef struct {
+    BT_HDR hdr; // Header comes first
+    uint8_t data[BTC_MEDIA_AA_BUF_SIZE -
+                 sizeof(BT_HDR)]; // Remaining space for data
+} sbc_complete_buffer_t;
+
+static sbc_complete_buffer_t sbc_buffer_pool[SBC_BUFFER_POOL_SIZE];
+static bool sbc_buffer_used[SBC_BUFFER_POOL_SIZE];
+static osi_mutex_t sbc_buffer_lock;
+static bool sbc_buffer_initialized = false;
+
+esp_err_t sbc_buffer_pool_init(void) {
+    if (sbc_buffer_initialized)
+        return ESP_OK;
+
+    esp_err_t ret = osi_mutex_new(&sbc_buffer_lock);
+    if (ret != ESP_OK)
+        return ret;
+
+    memset(sbc_buffer_used, 0, sizeof(sbc_buffer_used));
+    sbc_buffer_initialized = true;
+
+    ESP_EARLY_LOGD(
+        TAG, "SBC buffer pool initialized, range: %p - %p (size: %d bytes)",
+        &sbc_buffer_pool[0],
+        (uint8_t*)&sbc_buffer_pool[0] + sizeof(sbc_buffer_pool) - 1,
+        sizeof(sbc_buffer_pool));
+    return ESP_OK;
+}
+
+BT_HDR* sbc_buffer_alloc(void) {
+    if (!sbc_buffer_initialized) {
+        ESP_EARLY_LOGD(TAG, "Attempt to free SBC buffer before initialization");
+        return NULL;
+    }
+
+    osi_mutex_lock(&sbc_buffer_lock, OSI_MUTEX_MAX_TIMEOUT);
+
+    for (int i = 0; i < SBC_BUFFER_POOL_SIZE; i++) {
+        if (!sbc_buffer_used[i]) {
+            sbc_buffer_used[i] = true;
+            osi_mutex_unlock(&sbc_buffer_lock);
+            ESP_EARLY_LOGD(TAG, "Allocated buffer %d at %p", i,
+                           &sbc_buffer_pool[i]);
+            return (BT_HDR*)&sbc_buffer_pool[i];
+        }
+    }
+
+    osi_mutex_unlock(&sbc_buffer_lock);
+    ESP_EARLY_LOGD(TAG, "SBC buffer pool exhausted");
+    return NULL;
+}
+
+esp_err_t sbc_buffer_free(BT_HDR* buf) {
+    if (!sbc_buffer_initialized) {
+        ESP_EARLY_LOGD(TAG, "Attempt to free SBC buffer before initialization");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (buf == NULL) {
+        ESP_EARLY_LOGD(TAG, "Attempt to free NULL SBC buffer");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Quick check: is the pointer within the general pool area?
+    if ((uint8_t*)buf < (uint8_t*)sbc_buffer_pool ||
+        (uint8_t*)buf >= (uint8_t*)sbc_buffer_pool + sizeof(sbc_buffer_pool)) {
+        ESP_EARLY_LOGD(
+            TAG, "Attempt to free pointer %p outside of SBC buffer pool range",
+            buf);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    osi_mutex_lock(&sbc_buffer_lock, OSI_MUTEX_MAX_TIMEOUT);
+
+    // Check exact alignment
+    size_t offset = (uint8_t*)buf - (uint8_t*)sbc_buffer_pool;
+    if (offset % BTC_MEDIA_AA_BUF_SIZE != 0) {
+        osi_mutex_unlock(&sbc_buffer_lock);
+        ESP_EARLY_LOGD(TAG, "Attempt to free unaligned SBC buffer pointer %p",
+                       buf);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    int idx = offset / BTC_MEDIA_AA_BUF_SIZE;
+    if (idx >= 0 && idx < SBC_BUFFER_POOL_SIZE) {
+        sbc_buffer_used[idx] = false;
+        osi_mutex_unlock(&sbc_buffer_lock);
+        ESP_EARLY_LOGD(TAG, "Freed buffer %d at %p", idx, buf);
+        return ESP_OK;
+    }
+
+    osi_mutex_unlock(&sbc_buffer_lock);
+    ESP_EARLY_LOGD(TAG, "Attempt to free invalid SBC buffer pointer %p", buf);
+
+    return ESP_ERR_INVALID_ARG;
 }

@@ -22,6 +22,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include "esp_heap_caps.h"
+#include "stack/bt_types.h"
 
 char *osi_strdup(const char *str);
 
@@ -108,9 +109,19 @@ do {                                                    \
 // Memory alloc function with print and assertion when fails
 #define osi_malloc(size)                  osi_malloc_func((size))
 #define osi_calloc(size)                  osi_calloc_func((size))
-#define osi_free(p)                       free((p))
+#define osi_free(p)                                     \
+    do {                                                \
+        if (sbc_buffer_free((BT_HDR*)(p)) != ESP_OK) {  \
+            free((p));                                  \
+        }                                               \
+    } while (0)
 
 #endif /* HEAP_MEMORY_DEBUG */
+
+// SBC buffer pool
+esp_err_t sbc_buffer_pool_init(void);
+BT_HDR* sbc_buffer_alloc(void);
+esp_err_t sbc_buffer_free(BT_HDR* buf);
 
 #define FREE_AND_RESET(a)   \
 do {                        \

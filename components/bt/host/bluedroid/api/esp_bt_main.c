@@ -155,6 +155,11 @@ esp_err_t esp_bluedroid_init_with_cfg(esp_bluedroid_config_t *cfg)
         return ESP_ERR_INVALID_STATE;
     }
 
+    if (sbc_buffer_pool_init() != ESP_OK) {
+        LOG_ERROR("SBC buffer pool init failed\n");
+        return ESP_FAIL;
+    }
+
 #if HEAP_MEMORY_DEBUG
     osi_mem_dbg_init();
 #endif
