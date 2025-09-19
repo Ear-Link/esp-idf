@@ -263,6 +263,10 @@ void osi_free_func(void *ptr)
  */
 #define SBC_BUFFER_POOL_SIZE 2
 
+#ifndef BTC_MEDIA_AA_BUF_SIZE
+#define BTC_MEDIA_AA_BUF_SIZE (4096+16)
+#endif
+
 // Each buffer should be BTC_MEDIA_AA_BUF_SIZE bytes total
 // We need to allocate the header + data area together
 typedef struct {
