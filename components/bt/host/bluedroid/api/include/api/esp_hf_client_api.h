@@ -108,6 +108,7 @@ typedef enum {
     ESP_HF_CLIENT_RING_IND_EVT,                      /*!< ring indication event */
     ESP_HF_CLIENT_PKT_STAT_NUMS_GET_EVT,             /*!< requested number of packet different status */
     ESP_HF_CLIENT_PROF_STATE_EVT,                    /*!< Indicate HF CLIENT init or deinit complete */
+    ESP_HF_CLIENT_EVT_COUNT,                         /*!< number of events */
 } esp_hf_client_cb_event_t;
 
 /// HFP client callback parameters
