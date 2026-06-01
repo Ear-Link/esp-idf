@@ -1066,7 +1066,7 @@ void l2c_link_check_send_pkts (tL2C_LCB *p_lcb, tL2C_CCB *p_ccb, BT_HDR *p_buf)
     ** This LCB will be served when receiving number of completed packet event.
     */
     if (l2cb.is_cong_cback_context) {
-        L2CAP_TRACE_ERROR("l2cab is_cong_cback_context");
+        // L2CAP_TRACE_ERROR("l2cab is_cong_cback_context");
         return;
     }
 
